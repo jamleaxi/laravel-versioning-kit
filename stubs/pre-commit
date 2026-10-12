@@ -1,0 +1,20 @@
+#!/bin/sh
+# Writes version.json as MAJOR.MINOR (from VERSION) + build number (commit count including this one).
+# Installed by laravel-versioning-kit. Edit VERSION to bump MAJOR.MINOR; the build number is automatic.
+root=$(git rev-parse --show-toplevel)
+
+if [ -f "$root/VERSION" ]; then
+    base=$(tr -d '[:space:]' < "$root/VERSION")
+else
+    base="1.0"
+fi
+
+if git rev-parse --verify HEAD >/dev/null 2>&1; then
+    build=$(git rev-list --count HEAD)
+else
+    build=0
+fi
+build=$((build + 1))
+
+printf '{\n    "version": "%s.%s"\n}\n' "$base" "$build" > "$root/version.json"
+git add "$root/version.json"
