@@ -1,0 +1,8 @@
+#!/bin/sh
+# Installed by laravel-versioning-kit (--block-push).
+# Pushes only go through `vk push`, which sets VK_PUSH=1.
+if [ "$VK_PUSH" != "1" ]; then
+    echo "Push blocked: use 'vk push' (php .vk/vk.php push)." >&2
+    echo "To bypass once: VK_PUSH=1 git push" >&2
+    exit 1
+fi

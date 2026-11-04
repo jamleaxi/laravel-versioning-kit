@@ -1,116 +1,101 @@
 # Laravel Versioning Kit
 
-Automatic app versioning for Laravel projects, in the form **`MAJOR.MINOR.BUILD`** (e.g. `1.0.25`).
+Versioning, a pending change log, and an auto-updated README **Version Trail** for Laravel projects.
 
-- **MAJOR.MINOR** — you set it by hand in a `VERSION` file.
-- **BUILD** — set automatically on every commit (= total number of commits).
-- Available anywhere in the app as `config('app.version')`.
+- Version format **`MAJOR.MINOR.BUILD`** (e.g. `1.1.113`). `MAJOR.MINOR` is edited by hand in `VERSION`; `BUILD` goes up by one on every `vk push`.
+- Changes are logged **as you work** (`vk change "..."`), building a draft commit message in the format `YYYY-MM-DD Title` + `• bullet` lines.
+- **Nothing is committed or pushed except by `vk push`**, which bumps the version once, adds an entry to the README trail, makes one commit and pushes.
+- Available in the app as `config('app.version')`.
 
 Works on Windows, macOS and Linux. No packages to install.
-
----
 
 ## Requirements
 
 - PHP 8.1+ and Git (Git for Windows on Windows)
-- A Laravel project that is the **root** of its git repository (run `git init` first if needed)
+- A Laravel project that is the **root** of its git repository
 
-## Install (≈1 minute)
-
-From anywhere, run the installer and point it at your project:
+## Install
 
 ```bash
-php path/to/laravel-versioning-kit/install.php path/to/your-project --version=1.0
+php path/to/laravel-versioning-kit/install.php path/to/project --name="App Name" --description="One-line description"
 ```
 
-Or run it from inside your project folder without a path:
+| Option | Meaning |
+|---|---|
+| `--version=1.0` | Starting MAJOR.MINOR (ignored if `VERSION` exists) |
+| `--name=` / `--description=` | Shown at the top of the generated README |
+| `--block-push` | Also install a `pre-push` hook so plain `git push` is blocked (only `vk push` works). Off by default, since GUI clients like GitKraken would be blocked too. |
+| `--force` | Replace a different `core.hooksPath` / custom hooks |
+
+The installer is safe to re-run. On first run it:
+
+- moves an existing `README.md` to `docs/ABOUT.md` and writes a new README (badges, getting started, **Version Trail** backfilled from your dated commit messages),
+- adds the `vk` tool, a `CLAUDE.md` rule block, `.gitignore`/`.gitattributes` entries,
+- removes the old per-commit hook (`BUILD = commit count`); the build number now continues from `version.json`.
+
+Then review the README and release the setup with `vk push`.
+
+## Day to day
 
 ```bash
-php path/to/laravel-versioning-kit/install.php --version=1.0
+vk change "Fixed bug on request quantity"   # log a change (Claude does this for you, see CLAUDE.md)
+vk title  "Bug Fix"                          # set the commit title
+vk status                                    # draft commit message + upcoming version
+vk push                                      # version bump + README trail + ONE commit + push
+vk push --dry-run                            # preview, change nothing
+vk push "Other Title"                        # override the title for this push
 ```
 
-`--version` is the starting MAJOR.MINOR (default `1.0`). It's ignored if the project already has a `VERSION` file.
+`vk` = `./vk` (bash) / `.\vk` (PowerShell, cmd). Without the wrappers: `php .vk/vk.php <command>`.
 
-The installer is safe to re-run — each step skips itself if it's already done.
-
-### Then do these two things
-
-**1. Show the version** somewhere in your layout (footer, sidebar, about page):
-
-```blade
-v{{ config('app.version') }}
-```
-
-**2. Commit the setup:**
-
-```bash
-git add VERSION version.json .githooks .gitattributes config/app.php composer.json
-git update-index --chmod=+x .githooks/pre-commit
-git commit -m "System Versioning"
-```
-
-After that commit, `version.json` will show your first real build number.
-
----
-
-## Day-to-day use
+The draft lives in `.changes/` (git-ignored): `pending.md` (title + bullets) and `draft-message.txt` (the exact commit message). If a commit fails, nothing is changed; if the push fails, the commit is kept and `vk push` pushes it on the next run.
 
 | You want to… | Do this |
 |---|---|
-| Release a new minor/major | Edit `VERSION` (`1.0` → `1.1`, or `1.4` → `2.0`) and commit. The build number keeps counting. |
-| Check the current version | Open `version.json`, or `php artisan tinker` → `config('app.version')` |
-| Show it in the UI | `{{ config('app.version') }}` |
+| Release a new minor/major | Edit `VERSION` (`1.1` → `1.2`) and run `vk push`. BUILD keeps counting. |
+| Check the current version | `version.json`, the README badge, or `config('app.version')` |
 
-Never edit `version.json` by hand — the hook overwrites it on every commit.
+Never edit `version.json` or the trail markers in `README.md` by hand.
 
----
-
-## What the installer changes
+## Files the installer adds or changes
 
 | File | Change |
 |---|---|
-| `VERSION` | New. Holds `MAJOR.MINOR`. |
-| `.githooks/pre-commit` | New. On every commit, writes `version.json` and stages it. |
-| `version.json` | New. `{ "version": "1.0.25" }` — committed, so servers get it without git. |
-| `.gitattributes` | Adds `/.githooks/* text eol=lf` (a hook saved with Windows line endings won't run). |
-| `config/app.php` | Adds a `'version'` key that reads `version.json` (falls back to `dev`). |
-| `composer.json` | Adds a `post-autoload-dump` script that turns the hook on (see below). |
-| `.git/config` | Sets `core.hooksPath = .githooks` for your clone. |
-
-### Why the composer.json change?
-
-Git does **not** copy `core.hooksPath` when someone clones a repo. Without it, the hook silently doesn't run and the version stops updating.
-The composer script re-enables it automatically every time someone runs `composer install` / `composer update`, so teammates don't have to remember anything.
-If someone clones without running composer, they can enable it manually:
-
-```bash
-git config core.hooksPath .githooks
-```
-
----
+| `.vk/vk.php`, `vk`, `vk.bat` | The tool and its launchers |
+| `VERSION` | `MAJOR.MINOR`, hand-edited |
+| `version.json` | `{ "version": "1.1.113" }`, committed so servers get it without git |
+| `README.md` | Generated; contains `<!-- VK:TRAIL:START/END -->` markers that `vk push` writes between |
+| `docs/ABOUT.md` | The project's previous README |
+| `CLAUDE.md` | Rules: log changes after each task; never commit/push unless asked |
+| `.githooks/pre-push` | Only with `--block-push` |
+| `.gitattributes`, `.gitignore` | LF endings for hooks and `vk`; ignore `/.changes/` |
+| `config/app.php` | `'version'` key reading `version.json` |
+| `composer.json` | `post-autoload-dump` re-enables `core.hooksPath` after clone |
 
 ## Good to know
 
-- **Merge conflicts in `version.json`** — just accept either side. The hook rewrites it with the correct number when you commit the merge.
-- **Rewriting history changes build numbers.** Squash merges, rebases, and `git reset` lower the commit count, so build numbers can repeat. `git commit --amend` adds one extra. Plain commits keep it accurate.
-- **Commits made outside your machine** (GitHub web editor, a teammate without the hook enabled) don't update `version.json`. The next normal commit fixes it.
-- **Already using Husky or another hooks folder?** The installer stops instead of overwriting it. Copy the contents of `stubs/pre-commit` into your existing pre-commit hook, then re-run with `--force` only if you want to switch to `.githooks`.
-- **Laravel project in a subfolder of the repo** (monorepo) isn't supported by the installer.
-
-## Uninstall
-
-1. `git config --unset core.hooksPath`
-2. Delete `VERSION`, `version.json`, `.githooks/`
-3. Remove the `'version'` block from `config/app.php`, the `core.hooksPath` line from `composer.json`, and the `.githooks` line from `.gitattributes`
-4. Remove `config('app.version')` from your views
-
----
+- `vk push` stages everything (`git add -A`, respecting `.gitignore`) — use `--dry-run` to see the file list first.
+- The README trail is rebuilt from git history only once (at install). Re-run with `php .vk/vk.php backfill --force` to rebuild.
+- A plain `git commit` does not bump the version or touch the trail; use `vk push` for releases.
+- Merge conflicts in `version.json` or the trail: keep both sides' entries, fix the number, then `vk push`.
+- Laravel project in a subfolder of the repo (monorepo) isn't supported.
 
 ## Kit contents
 
 ```
 laravel-versioning-kit/
-├── install.php        # the installer
-├── stubs/pre-commit   # the git hook that gets copied into projects
-└── README.md
+├── install.php                 # the installer
+├── README.md
+└── stubs/
+    ├── vk.php                  # the tool (change / title / status / push / backfill)
+    ├── vk, vk.bat              # launchers for bash and Windows
+    ├── pre-push                # optional hook (--block-push)
+    ├── README.template.md      # generated project README
+    └── CLAUDE.block.md         # rules added to the project's CLAUDE.md
 ```
+
+## Uninstall
+
+1. `git config --unset core.hooksPath`
+2. Delete `VERSION`, `version.json`, `.vk/`, `vk`, `vk.bat`, `.githooks/`, `.changes/`
+3. Remove the vk block from `CLAUDE.md`, the `'version'` block from `config/app.php`, the `core.hooksPath` line from `composer.json`
